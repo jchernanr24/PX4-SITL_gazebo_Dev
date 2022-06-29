@@ -143,6 +143,10 @@ protected:
 private:
   bool received_first_actuator_{false};
   Eigen::VectorXd input_reference_;
+  Eigen::VectorXd mirror_reference_;
+  int max_mirrored_joints_{2};
+  int mirror_index_;
+  int index_to_mirror_[4];
 
   float protocol_version_{2.0};
 
@@ -164,8 +168,11 @@ private:
   bool send_odometry_{false};
 
   std::vector<physics::JointPtr> joints_;
+  std::vector<physics::JointPtr> mirror_joints_;
   std::vector<common::PID> pids_;
+  std::vector<common::PID> mirror_pids_;
   std::vector<double> joint_max_errors_;
+  std::vector<double> mirror_joint_max_errors_;
 
   /// \brief Pointer to the update event connection.
   event::ConnectionPtr updateConnection_;

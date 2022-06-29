@@ -1093,7 +1093,7 @@
           <joint_control_type>velocity</joint_control_type>
           <joint_name>rotor_3_joint</joint_name>
         </channel>
-        <channel name="motor0_tilt">
+        <channel name="_front_motors_tilt">
           <input_index>4</input_index>
           <input_offset>0.785398</input_offset>
           <input_scaling>0.785398</input_scaling>
@@ -1101,6 +1101,7 @@
           <zero_position_armed>0</zero_position_armed>
           <joint_control_type>position</joint_control_type>
           <joint_name>motor_0_joint</joint_name>
+          <joint_name_mirror>motor_2_joint</joint_name_mirror>
            <joint_control_pid>
             <p>10</p>
             <i>0</i>
@@ -1112,14 +1113,15 @@
             <errMax>0.2</errMax>
           </joint_control_pid>
         </channel>
-        <channel name="motor1_tilt">
-          <input_index>4</input_index>
+        <channel name="rear_motors_tilt">
+          <input_index>5</input_index>
           <input_offset>0.785398</input_offset>
           <input_scaling>0.785398</input_scaling>
           <zero_position_disarmed>0</zero_position_disarmed>
           <zero_position_armed>0</zero_position_armed>
           <joint_control_type>position</joint_control_type>
           <joint_name>motor_1_joint</joint_name>
+          <joint_name_mirror>motor_3_joint</joint_name_mirror>
            <joint_control_pid>
             <p>10</p>
             <i>0</i>
@@ -1131,7 +1133,7 @@
             <errMax>0.2</errMax>
           </joint_control_pid>
         </channel>
-        <channel name="motor2_tilt">
+        <!-- <channel name="motor2_tilt">
           <input_index>5</input_index>
           <input_offset>0.785398</input_offset>
           <input_scaling>0.785398</input_scaling>
@@ -1168,7 +1170,7 @@
             <cmdMin>-2</cmdMin>
             <errMax>0.2</errMax>
           </joint_control_pid>
-        </channel>
+        </channel> -->
         <channel name="left_elevon">
           <input_index>8</input_index>
           <input_offset>0</input_offset>

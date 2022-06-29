@@ -215,15 +215,25 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
   getSdfParam<std::string>(_sdf, "groundtruthSubTopic", groundtruth_sub_topic_, groundtruth_sub_topic_);
 
   // set input_reference_ from inputs.control
+  mirror_index_ = 0;
   input_reference_.resize(n_out_max);
+  mirror_reference_.resize(max_mirrored_joints_);
   joints_.resize(n_out_max);
+  mirror_joints_.resize(max_mirrored_joints_);
   pids_.resize(n_out_max);
+  mirror_pids_.resize(max_mirrored_joints_);
   joint_max_errors_.resize(n_out_max);
   for (int i = 0; i < n_out_max; ++i)
   {
     pids_[i].Init(0, 0, 0, 0, 0, 0, 0);
     input_reference_[i] = 0;
   }
+  for (int i = 0; i < max_mirrored_joints_; ++i)
+  {
+    mirror_pids_[i].Init(0, 0, 0, 0, 0, 0, 0);
+    mirror_reference_[i] = 0;
+  }
+
 
   if (_sdf->HasElement("control_channels")) {
     sdf::ElementPtr control_channels = _sdf->GetElement("control_channels");
@@ -271,6 +281,15 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
           {
             std::string joint_name = channel->Get<std::string>("joint_name");
             joints_[index] = model_->GetJoint(joint_name);
+          }
+          if (channel->HasElement("joint_name_mirror"))
+          {
+            std::string joint_name_mirror = channel->Get<std::string>("joint_name_mirror");
+            mirror_joints_[mirror_index_] = model_->GetJoint(joint_name_mirror);
+            int index_duo_ = channel->Get<int>("input_index");
+            index_to_mirror_[mirror_index_] = index_duo_;
+            mirror_index_ = mirror_index_+1;
+            std::cout << "Duo joint index " << index_duo_ << "\n";
           }
 
           // setup joint control pid to control joint
@@ -1104,8 +1123,10 @@ void GazeboMavlinkInterface::handle_actuator_controls() {
   for (unsigned i = 0; i < n_out_max; i++) {
     input_index_[i] = i;
   }
+
   // Read Input References
   input_reference_.resize(n_out_max);
+  mirror_reference_.resize(max_mirrored_joints_);
 
   Eigen::VectorXd actuator_controls = mavlink_interface_->GetActuatorControls();
   if (actuator_controls.size() < n_out_max) return; //TODO: Handle this properly
@@ -1119,6 +1140,22 @@ void GazeboMavlinkInterface::handle_actuator_controls() {
       // std::cout << input_reference_ << ", ";
     }
   }
+  for (int i = 0; i < max_mirrored_joints_; i++) {
+    // std::cout << "Size" << max_mirrored_joints_ << "\n";
+     if (armed) {
+      int index_temp_ =  index_to_mirror_[i];
+      // std::cout << "Copy index" << index_temp_ << "\n";
+      mirror_reference_[i] = (actuator_controls[index_temp_] + input_offset_[index_temp_])
+          * input_scaling_[index_temp_] + zero_position_armed_[index_temp_];
+      // std::cout << mirror_reference_ << ", ";
+    } else {
+      int index_temp_ =  index_to_mirror_[i];
+      // std::cout << "Copy index " << index_temp_ << "\n";
+      mirror_reference_[i] = zero_position_disarmed_[index_temp_];
+      // std::cout << mirror_reference_ << ", ";
+    }
+  }
+
   // std::cout << "Input Reference: " << input_reference_.transpose() << std::endl;
   received_first_actuator_ = mavlink_interface_->GetReceivedFirstActuator();
 }
@@ -1184,6 +1221,69 @@ void GazeboMavlinkInterface::handle_control(double _dt)
       }
     }
   }
+  // set joint positions for mirrored joints
+  for (int i = 0; i < mirror_reference_.size(); i++) {
+    int index_temp_ = index_to_mirror_[i];
+    if (mirror_joints_[i] || joint_control_type_[index_temp_] == "position_gztopic") {
+      double target = mirror_reference_[i];
+      if (joint_control_type_[index_temp_] == "velocity")
+      {
+        double current = mirror_joints_[i]->GetVelocity(0);
+        double err = current - target;
+        double force = pids_[index_temp_].Update(err, _dt);
+        mirror_joints_[i]->SetForce(0, force);
+      }
+      else if (joint_control_type_[index_temp_] == "position")
+      {
+
+#if GAZEBO_MAJOR_VERSION >= 9
+        double current = mirror_joints_[i]->Position(0);
+#else
+        double current = mirror_joints_[i]->GetAngle(0).Radian();
+#endif
+
+        double err = current - target;
+        if(joint_max_errors_[index_temp_]!=0.) {
+          err = std::max(std::min(err, joint_max_errors_[index_temp_]), -joint_max_errors_[index_temp_]);
+        }
+        double force = pids_[index_temp_].Update(err, _dt);
+        mirror_joints_[i]->SetForce(0, force);
+      }
+    //   else if (joint_control_type_[index_temp_] == "position_gztopic")
+    //   {
+    //  #if GAZEBO_MAJOR_VERSION > 7 || (GAZEBO_MAJOR_VERSION == 7 && GAZEBO_MINOR_VERSION >= 4)
+    //     /// only gazebo 7.4 and above support Any
+    //     gazebo::msgs::Any m;
+    //     m.set_type(gazebo::msgs::Any_ValueType_DOUBLE);
+    //     m.set_double_value(target);
+    //  #else
+    //     std::stringstream ss;
+    //     gazebo::msgs::GzString m;
+    //     ss << target;
+    //     m.set_data(ss.str());
+    //  #endif
+    //     joint_control_pub_[i]->Publish(m); // FIX THIS
+    //   }
+      else if (joint_control_type_[index_temp_] == "position_kinematic")
+      {
+        /// really not ideal if your drone is moving at all,
+        /// mixing kinematic updates with dynamics calculation is
+        /// non-physical.
+     #if GAZEBO_MAJOR_VERSION >= 6
+        mirror_joints_[i]->SetPosition(0, mirror_reference_[i]);
+     #else
+        mirror_joints_[i]->SetAngle(0, mirror_reference_[i]);
+     #endif
+      }
+      else
+      {
+        gzerr << "joint_control_type[" << joint_control_type_[index_temp_] << "] undefined.\n";
+      }
+    }
+  }
+
+
+
 }
 
 bool GazeboMavlinkInterface::IsRunning()
