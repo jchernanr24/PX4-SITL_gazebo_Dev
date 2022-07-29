@@ -146,7 +146,7 @@ private:
   Eigen::VectorXd mirror_reference_;
   int max_mirrored_joints_{2};
   int mirror_index_;
-  int index_to_mirror_[4];
+  // int index_to_mirror_[4];
 
   float protocol_version_{2.0};
 

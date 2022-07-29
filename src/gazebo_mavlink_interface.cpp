@@ -233,7 +233,8 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
     mirror_pids_[i].Init(0, 0, 0, 0, 0, 0, 0);
     mirror_reference_[i] = 0;
   }
-
+  int a = 4;
+  int index_to_mirror_[a];
 
   if (_sdf->HasElement("control_channels")) {
     sdf::ElementPtr control_channels = _sdf->GetElement("control_channels");
@@ -1143,7 +1144,8 @@ void GazeboMavlinkInterface::handle_actuator_controls() {
   for (int i = 0; i < max_mirrored_joints_; i++) {
     // std::cout << "Size" << max_mirrored_joints_ << "\n";
      if (armed) {
-      int index_temp_ =  index_to_mirror_[i];
+      int index_temp_;
+      index_temp_ =  index_to_mirror_[i];
       // std::cout << "Copy index" << index_temp_ << "\n";
       mirror_reference_[i] = (actuator_controls[index_temp_] + input_offset_[index_temp_])
           * input_scaling_[index_temp_] + zero_position_armed_[index_temp_];
